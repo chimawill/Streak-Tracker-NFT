@@ -1,0 +1,234 @@
+# Streak Tracker NFT Contract
+
+A Stacks blockchain smart contract that gamifies daily habits by tracking user streaks and rewarding achievements with NFTs.
+
+## Overview
+
+The Streak Tracker NFT contract allows users to:
+- Check in daily to maintain habit streaks
+- Earn NFT rewards for reaching milestone streaks (7, 30, 100, 365 days)
+- Track personal statistics including best streak, lifetime check-ins, and current streak
+- Transfer and manage earned NFT achievements
+
+## Features
+
+###  Streak Tracking
+- Daily check-in system based on Stacks block height
+- Automatic streak calculation and maintenance
+- Protection against multiple check-ins per day
+- Streak reset logic for missed days
+
+###  NFT Rewards
+- Milestone-based NFT minting (configurable rewards)
+- Default milestones: 7, 30, 100, and 365-day streaks
+- SIP-009 compliant NFT implementation
+- Transferable and burnable NFTs
+
+###  Statistics
+- Current active streak count
+- Personal best streak record
+- Lifetime total check-ins
+- Account creation tracking
+
+###  Security Features
+- Input validation for all public functions
+- Owner-only administrative functions
+- Contract pause/unpause functionality
+- Protection against invalid operations
+
+## Contract Functions
+
+### Public Functions
+
+#### Daily Operations
+```clarity
+(perform-daily-checkin)
+```
+Main function for users to check in daily. Updates streak count and mints milestone NFTs automatically.
+
+#### NFT Management
+```clarity
+(transfer-nft (token-id uint) (sender principal) (recipient principal))
+(burn-nft (token-id uint))
+```
+Standard NFT transfer and burn operations with ownership validation.
+
+#### Administrative Functions (Owner Only)
+```clarity
+(configure-milestone-reward (streak-days uint) (metadata-uri (string-ascii 256)) (bonus-points uint))
+(set-contract-metadata-uri (uri (string-ascii 256)))
+(toggle-contract-state)
+(admin-mint-special (recipient principal) (metadata-uri (string-ascii 256)))
+```
+
+### Read-Only Functions
+
+#### User Statistics
+```clarity
+(get-user-statistics (user principal))
+(get-current-active-streak (user principal))
+(get-personal-best-streak (user principal))
+(get-lifetime-checkin-count (user principal))
+(can-checkin-today (user principal))
+```
+
+#### NFT Information
+```clarity
+(get-nft-owner (token-id uint))
+(get-current-token-supply)
+(get-token-metadata-uri (token-id uint))
+(does-token-exist (token-id uint))
+```
+
+#### Contract Information
+```clarity
+(get-contract-metadata-uri)
+(get-milestone-reward-info (streak-days uint))
+(is-contract-active)
+```
+
+## Default Milestone Rewards
+
+The contract comes pre-configured with these milestone rewards:
+
+| Streak Days | Bonus Points | Metadata URI |
+|-------------|--------------|--------------|
+| 7 days | 10 points | `7-day-streak.json` |
+| 30 days | 50 points | `30-day-streak.json` |
+| 100 days | 200 points | `100-day-streak.json` |
+| 365 days | 1000 points | `365-day-streak.json` |
+
+## Time Calculation
+
+The contract uses Stacks block height to determine days:
+- **Blocks per day**: 144 (approximate)
+- **Day calculation**: `block-height / 144`
+- **Same day check**: Prevents multiple check-ins within the same calculated day
+- **Consecutive days**: Validates streaks continue on subsequent days
+
+## Error Codes
+
+| Code | Constant | Description |
+|------|----------|-------------|
+| u100 | ERR-OWNER-ONLY | Operation restricted to contract owner |
+| u101 | ERR-NOT-TOKEN-OWNER | User doesn't own the specified token |
+| u102 | ERR-ALREADY-CHECKED-IN-TODAY | User already checked in today |
+| u103 | ERR-STREAK-BROKEN | Streak was broken (unused in current logic) |
+| u104 | ERR-INVALID-TOKEN-ID | Token ID doesn't exist |
+| u105 | ERR-NOT-FOUND | Requested data not found |
+| u106 | ERR-UNAUTHORIZED-OPERATION | Contract is paused or operation not allowed |
+| u107 | ERR-INVALID-INPUT | General invalid input error |
+| u108 | ERR-INVALID-URI | Invalid URI format or length |
+| u109 | ERR-INVALID-STREAK-DAYS | Invalid streak days value |
+| u110 | ERR-INVALID-BONUS-POINTS | Invalid bonus points value |
+
+## Input Validation
+
+The contract includes comprehensive input validation:
+
+### URI Validation
+- Minimum length: 1 character
+- Maximum length: 256 characters
+
+### Streak Days Validation
+- Minimum: 1 day
+- Maximum: 36,500 days (100 years)
+
+### Bonus Points Validation
+- Maximum: 100,000 points
+
+### Principal Validation
+- Prevents null/invalid addresses
+
+## Deployment
+
+### Prerequisites
+- [Clarinet](https://docs.hiro.so/stacks/clarinet) for local development and testing
+- Stacks wallet for mainnet/testnet deployment
+
+### Local Testing
+```bash
+# Initialize Clarinet project (if not already done)
+clarinet new streak-tracker-nft
+cd streak-tracker-nft
+
+# Add the contract
+# Copy the contract code to contracts/streak-tracker-nft.clar
+
+# Check contract syntax
+clarinet check
+
+# Run tests
+clarinet test
+```
+
+### Network Deployment
+```bash
+# Deploy to testnet
+clarinet deploy --testnet
+
+# Deploy to mainnet
+clarinet deploy --mainnet
+```
+
+## Usage Examples
+
+### Daily Check-in
+```javascript
+// Using Stacks.js
+const txOptions = {
+  contractAddress: 'ST1234...', // Your deployed contract address
+  contractName: 'streak-tracker-nft',
+  functionName: 'perform-daily-checkin',
+  functionArgs: [],
+  senderKey: privateKey,
+  network: new StacksTestnet()
+};
+
+const transaction = await makeContractCall(txOptions);
+```
+
+### Check User Statistics
+```javascript
+const userStats = await callReadOnlyFunction({
+  contractAddress: 'ST1234...',
+  contractName: 'streak-tracker-nft',
+  functionName: 'get-user-statistics',
+  functionArgs: [principalCV('ST1234...')],
+  network: new StacksTestnet()
+});
+```
+
+### Configure New Milestone (Owner Only)
+```javascript
+const txOptions = {
+  contractAddress: 'ST1234...',
+  contractName: 'streak-tracker-nft',
+  functionName: 'configure-milestone-reward',
+  functionArgs: [
+    uintCV(50), // 50-day milestone
+    stringAsciiCV('https://api.example.com/50-day.json'),
+    uintCV(75) // 75 bonus points
+  ],
+  senderKey: ownerPrivateKey,
+  network: new StacksTestnet()
+};
+```
+
+## Security Considerations
+
+1. **Input Validation**: All user inputs are validated before processing
+2. **Access Control**: Administrative functions are restricted to contract owner
+3. **Overflow Protection**: Safe arithmetic operations throughout
+4. **State Consistency**: Atomic operations prevent inconsistent state
+5. **Reentrancy**: No external calls that could cause reentrancy issues
+
+## Development Roadmap
+
+### Potential Future Enhancements
+- [ ] Multiple habit tracking (not just daily check-ins)
+- [ ] Social features (streak competitions, leaderboards)
+- [ ] Reward token integration
+- [ ] Custom streak categories
+- [ ] Achievement sharing and verification
+- [ ] Mobile app integration
